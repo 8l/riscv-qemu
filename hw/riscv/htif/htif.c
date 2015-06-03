@@ -117,6 +117,17 @@ static int htif_block_device_write(HTIFState *htifstate, uint64_t payload) {
 }
 
 static void htif_handle_tohost_write(HTIFState *htifstate, uint64_t val_written) {
+    // handle tests from riscv-tests
+    if (unlikely(val_written & 0x1)) {
+        // lsb is set, is a test
+        if (val_written == 0x1) {
+            printf("RISC-V Tests PASS\n");
+            exit(0);
+        } else {
+            printf("RISC-V Test %lu FAIL\n", (long)(val_written >> 0x1));
+            exit(val_written >> 0x1);
+        }
+    }
 
     uint8_t device = val_written >> 56;
     uint8_t cmd = val_written >> 48;
