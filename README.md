@@ -1,6 +1,8 @@
 riscv-qemu [![Build Status](https://travis-ci.org/riscv/riscv-qemu.svg?branch=master)](https://travis-ci.org/riscv/riscv-qemu)
 =========
 
+** This is a WIP upgrade to the new privileged spec. This does not work yet. **
+
 The riscv-softmmu target for full system emulation is currently supported. 
 It supports booting [riscv-linux] \(currently requires building from the 
 [qemu branch]\). A precompiled copy of the kernel is included in the 
