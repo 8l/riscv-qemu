@@ -71,7 +71,7 @@ DEF_HELPER_2(fclass_d, tl, env, tl)
 DEF_HELPER_3(csrrw, tl, env, tl, tl)
 DEF_HELPER_3(csrrs, tl, env, tl, tl)
 DEF_HELPER_3(csrrc, tl, env, tl, tl)
-DEF_HELPER_1(sret, tl, env)
+DEF_HELPER_1(eret, tl, env)
 DEF_HELPER_2(scall, tl, env, tl)
 DEF_HELPER_1(tlb_flush, void, env)
 #endif /* !CONFIG_USER_ONLY */

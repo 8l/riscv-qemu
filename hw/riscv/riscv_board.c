@@ -76,17 +76,21 @@ uint64_t identity_translate(void *opaque, uint64_t addr)
 
 static int64_t load_kernel (void)
 {
-    int64_t kernel_entry, kernel_high;
+    int64_t kernel_entry, kernel_high, kernel_low;
     int big_endian;
     big_endian = 0;
 
     if (load_elf(loaderparams.kernel_filename, identity_translate, NULL,
-                 (uint64_t *)&kernel_entry, NULL, (uint64_t *)&kernel_high,
+                 (uint64_t *)&kernel_entry, (uint64_t*)&kernel_low, (uint64_t *)&kernel_high,
                  big_endian, ELF_MACHINE, 1) < 0) {
         fprintf(stderr, "qemu: could not load kernel '%s'\n",
                 loaderparams.kernel_filename);
         exit(1);
     }
+    fprintf(stderr, "kernel_entry: %016lX\n", kernel_entry);
+    fprintf(stderr, "kernel_low: %016lX\n", kernel_low);
+    fprintf(stderr, "kernel_high: %016lX\n", kernel_high);
+
     return kernel_entry;
 }
 
@@ -152,21 +156,21 @@ static void riscv_board_init(QEMUMachineInitArgs *args)
     vmstate_register_ram_global(main_mem);
     memory_region_add_subregion(system_memory, 0x0, main_mem);
 
-    if (bios_name) {
+/*    if (bios_name) {
         int bios_size;
         MemoryRegion *bios;
         bios_size = get_image_size(bios_name);
-	if (bios_size > 0) {
-            bios = g_malloc(sizeof(*bios));
-            memory_region_init_ram(bios, NULL, "riscv.fw", bios_size);
-            vmstate_register_ram_global(bios);
-            memory_region_set_readonly(bios, true);
-            if (rom_add_file_fixed(bios_name, 0, -1) != 0) {
-                fprintf(stderr, "qemu: could not load RISC-V firmware '%s'\n", bios_name);
-                exit(1);
-            }
-	}
-    }
+        if (bios_size > 0) {
+                bios = g_malloc(sizeof(*bios));
+                memory_region_init_ram(bios, NULL, "riscv.fw", bios_size);
+                vmstate_register_ram_global(bios);
+                memory_region_set_readonly(bios, true);
+                if (rom_add_file_fixed(bios_name, 0, -1) != 0) {
+                    fprintf(stderr, "qemu: could not load RISC-V firmware '%s'\n", bios_name);
+                    exit(1);
+                }
+        }
+    }*/
 
     if (kernel_filename) {
         /* Write a small bootloader to the flash location. */

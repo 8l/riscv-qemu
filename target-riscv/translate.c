@@ -31,53 +31,6 @@
 
 #define RISCV_DEBUG_DISAS 0
 
-inline static int csr_regno(int regno);
-
-/* Get regno in our csr reg array from actual csr regno
- * Mapping:
- * [
- *  pos_in_array: regname (real reg number, input as int regno)
- *    0: sup0 (0x500),
- *    1: sup1 (0x501),
- *    2: epc (0x502),
- *    3: badvaddr (0x503),
- *    4: ptbr (0x504),
- *    5: asid (0x505),
- *    6: count (0x506),
- *    7: compare (0x507),
- *    8: evec (0x508),
- *    9: cause (0x509),
- *    A: status (0x50A),
- *    B: hartid (0x50B),
- *    C: impl (0x50C),
- *    D: fatc (0x50D),
- *    E: send_ipi (0x50E),
- *    F: clear_ipi (0x50F),
- *   10: cycle (0xC00),
- *   11: time (0xC01),
- *   12: instret (0xC02),
- *   13: fflags (0x1),
- *   14: frm (0x2),
- *   15: fcsr (0x3),
- *   ...
- *   1E: tohost (0x51E),
- *   1F: fromhost (0x51F)
- * ]
- */
-inline static int csr_regno(int regno)
-{
-    if (regno < 0x4 && regno > 0x0) { //0x1, 0x2, 0x3
-        return regno + 0x12;
-    }
-    if (regno < 0xC00) {
-        // 0x5xx registers
-        return 0xFF & regno;
-    }
-    // 0xC0x registers
-    return (0xF & regno) + 0x10;
-}
-
-
 #define MASK_OP_MAJOR(op)  (op & 0x7F)
 enum {
     /* rv32i, rv64i, rv32m */
@@ -235,9 +188,9 @@ enum {
 
 #define MASK_OP_SYSTEM(op)   (MASK_OP_MAJOR(op) | (op & (0x7 << 12)))
 enum {
-    OPC_RISC_SCALL       = OPC_RISC_SYSTEM | (0x0 << 12),
-    OPC_RISC_SBREAK      = OPC_RISC_SYSTEM | (0x0 << 12),
-    OPC_RISC_SRET        = OPC_RISC_SYSTEM | (0x0 << 12),
+    OPC_RISC_ECALL       = OPC_RISC_SYSTEM | (0x0 << 12),
+    OPC_RISC_EBREAK      = OPC_RISC_SYSTEM | (0x0 << 12),
+    OPC_RISC_ERET        = OPC_RISC_SYSTEM | (0x0 << 12),
     OPC_RISC_CSRRW       = OPC_RISC_SYSTEM | (0x1 << 12),
     OPC_RISC_CSRRS       = OPC_RISC_SYSTEM | (0x2 << 12),
     OPC_RISC_CSRRC       = OPC_RISC_SYSTEM | (0x3 << 12),
@@ -379,7 +332,7 @@ static inline void kill_unknown(DisasContext *ctx, int excp);
 enum {
     BS_NONE     = 0, // When seen outside of translation while loop, indicates
                      // need to exit tb due to end of page.
-    BS_STOP     = 1, // Need to exit tb for syscall, sret, etc.
+    BS_STOP     = 1, // Need to exit tb for syscall, eret, etc.
     BS_BRANCH   = 2, // Need to exit tb for branch, jal, etc.
 };
 
@@ -1500,18 +1453,18 @@ inline static void gen_system(DisasContext *ctx, uint32_t opc,
 
     switch (opc) {
 
-    case OPC_RISC_SCALL:
+    case OPC_RISC_ECALL:
         switch (backup_csr) {
-            case 0x0: // SCALL
-                generate_exception(ctx, RISCV_EXCP_SCALL);
+            case 0x0: // ECALL
+                generate_exception(ctx, RISCV_EXCP_ECALL);
                 ctx->bstate = BS_STOP;
                 break;
-            case 0x1: // SBREAK
+            case 0x1: // EBREAK
                 kill_unknown(ctx, RISCV_EXCP_BREAK);
                 ctx->bstate = BS_STOP;
                 break;
-            case 0x800: // SRET
-                gen_helper_sret(cpu_PC, cpu_env);
+            case 0x800: // ERET
+                gen_helper_eret(cpu_PC, cpu_env);
                 tcg_gen_exit_tb(0); // no chaining
                 ctx->bstate = BS_BRANCH;
                 break;
@@ -2219,25 +2172,7 @@ void riscv_cpu_dump_state(CPUState *cs, FILE *f, fprintf_function cpu_fprintf,
             cpu_fprintf(f, "\n");
         }
     }
-    for (i = 0; i < 32; i++) {
-        if ((i & 3) == 0) {
-            cpu_fprintf(f, "CSR%02d:", i);
-        }
-        if (i == CSR_COUNT) {
-            cpu_fprintf(f, " %s " TARGET_FMT_lx, cs_regnames[i], (target_ulong)cpu_riscv_get_count(env));
-
-        } else if (i == CSR_CYCLE) {
-            cpu_fprintf(f, " %s " TARGET_FMT_lx, cs_regnames[i], cpu_riscv_get_cycle(env));
-        } else if (i == CSR_FCSR) {
-             cpu_fprintf(f, " %s " TARGET_FMT_lx, cs_regnames[i], env->helper_csr[CSR_FFLAGS] | (env->helper_csr[CSR_FRM] << 5));
-        } else {
-            cpu_fprintf(f, " %s " TARGET_FMT_lx, cs_regnames[i], env->helper_csr[i]);
-        }
-        if ((i & 3) == 3) {
-            cpu_fprintf(f, "\n");
-        }
-    }
-
+    // TODO print csr values from env->helper_csr
     for (i = 0; i < 32; i++) {
         if ((i & 3) == 0) {
             cpu_fprintf(f, "FPR%02d:", i);

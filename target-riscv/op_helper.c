@@ -546,7 +546,7 @@ target_ulong helper_csrrc(CPURISCVState *env, target_ulong src, target_ulong csr
     return csr_backup;
 }
 
-target_ulong helper_sret(CPURISCVState *env)
+target_ulong helper_eret(CPURISCVState *env)
 {
     // first handle S/PS stack
     if (env->helper_csr[CSR_STATUS] & SR_PS) {
@@ -568,7 +568,7 @@ target_ulong helper_sret(CPURISCVState *env)
 
 target_ulong helper_scall(CPURISCVState *env, target_ulong bad_pc)
 {
-    env->helper_csr[CSR_CAUSE] = RISCV_EXCP_SCALL;
+    env->helper_csr[CSR_CAUSE] = RISCV_EXCP_ECALL;
     if (env->helper_csr[CSR_STATUS] & SR_S) {
         env->helper_csr[CSR_STATUS] |= SR_PS;
     } else {

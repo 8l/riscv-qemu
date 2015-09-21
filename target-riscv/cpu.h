@@ -20,52 +20,57 @@
 
 struct CPURISCVState;
 
-// RISCV CSR mappings. These are not the "real" mappings defined by the isa.
-// Instead, they are the indices into our csr array (ie the output given when
-// calling translate.c:csr_regno(REAL_CSR_REGNO)).
-#define CSR_SUP0       0x0
-#define CSR_SUP1       0x1
-#define CSR_EPC        0x2
-#define CSR_BADVADDR   0x3
-#define CSR_PTBR       0x4
-#define CSR_ASID       0x5
-#define CSR_COUNT      0x6
-#define CSR_COMPARE    0x7
-#define CSR_EVEC       0x8
-#define CSR_CAUSE      0x9
-#define CSR_STATUS     0xa
-#define CSR_HARTID     0xb
-#define CSR_IMPL       0xc
-#define CSR_FATC       0xd
-#define CSR_SEND_IPI   0xe
-#define CSR_CLEAR_IPI  0xf
-#define CSR_CYCLE     0x10
-#define CSR_TIME      0x11
-#define CSR_INSTRET   0x12
-#define CSR_FFLAGS    0x13
-#define CSR_FRM       0x14
-#define CSR_FCSR      0x15
-//...
-#define CSR_TOHOST    0x1e
-#define CSR_FROMHOST  0x1f
+// user new csrs
+#define csr_fflags   0x001
+#define csr_frm      0x002
+#define csr_fcsr     0x003
+#define csr_cycle    0xc00
+#define csr_time     0xc01
+#define csr_instret  0xc02
+#define csr_cycleh   0xc80
+#define csr_timeh    0xc81
+#define csr_instreth 0xc82
+
+
+// supervisor new csrs
+#define csr_sstatus   0x100
+#define csr_stvec     0x101
+#define csr_sie       0x104
+#define csr_stimecmp  0x121
+#define csr_stime     0xd01
+#define csr_stimeh    0xd81
+#define csr_sscratch  0x140
+#define csr_sepc      0x141
+#define csr_scause    0xd42
+#define csr_sbadaddr  0xd43
+#define csr_sip       0x144
+#define csr_sptbr     0x180
+#define csr_sasid     0x181
+#define csr_cyclew    0x900
+#define csr_timew     0x901
+#define csr_instretw  0x902
+#define csr_cyclehw   0x980
+#define csr_timehw    0x981
+#define csr_instrethw 0x982
 
 // RISCV Exception Codes
 #define EXCP_NONE                       -1   // not a real RISCV exception code
 #define RISCV_EXCP_INST_ADDR_MIS        0x0
 #define RISCV_EXCP_INST_ACCESS_FAULT    0x1
 #define RISCV_EXCP_ILLEGAL_INST         0x2
-#define RISCV_EXCP_PRIV_INST            0x3
-#define RISCV_EXCP_FP_DISABLED          0x4
-#define RISCV_EXCP_SCALL                0x6
-#define RISCV_EXCP_BREAK                0x7
-#define RISCV_EXCP_LOAD_ADDR_MIS        0x8
-#define RISCV_EXCP_STORE_ADDR_MIS       0x9
-#define RISCV_EXCP_LOAD_ACCESS_FAULT    0xa
-#define RISCV_EXCP_STORE_ACCESS_FAULT   0xb
-#define RISCV_EXCP_STORE_ACCEL_DISABLED 0xc
-#define RISCV_EXCP_TIMER_INTERRUPT      (0x7 | (1 << 31)) 
-#define RISCV_EXCP_HOST_INTERRUPT       (0x6 | (1 << 31)) 
-#define RISCV_EXCP_SERIAL_INTERRUPT     (0x4 | (1 << 31)) // not part of ISA
+#define RISCV_EXCP_BREAKPOINT           0x3
+#define RISCV_EXCP_LOAD_ADDR_MIS        0x4
+#define RISCV_EXCP_LOAD_ACCESS_FAULT    0x5
+#define RISCV_EXCP_STORE_ADDR_MIS       0x6
+#define RISCV_EXCP_STORE_ACCESS_FAULT   0x7
+#define RISCV_EXCP_ECALL_U              0x8
+#define RISCV_EXCP_ECALL_S              0x9
+#define RISCV_EXCP_ECALL_H              0xa
+#define RISCV_EXCP_ECALL_M              0xb
+
+// Interrupts
+#define RISCV_EXCP_SOFT_INTERRUPT       (0x0 | (1 << 31)) 
+#define RISCV_EXCP_TIMER_INTERRUPT      (0x1 | (1 << 31)) 
 
 // RISCV Status Reg Bits
 #define SR_S           0x1
@@ -109,7 +114,7 @@ struct CPURISCVState {
     target_ulong SEGMask;
     target_ulong PAMask;
 
-    uint64_t helper_csr[32]; // RISCV CSR registers
+    uint64_t helper_csr[4096]; // RISCV CSR registers
 
     /* QEMU */
     CPU_COMMON
