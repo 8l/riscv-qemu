@@ -1,8 +1,7 @@
 /*
- *  QEMU RISC-V interrupt support
+ * QEMU RISC-V - QEMU IRQ Support
  *
- *  Author: Sagar Karandikar, skarandikar@berkeley.edu
- *  Based on the MIPS target interrupt support
+ * Author: Sagar Karandikar, sagark@eecs.berkeley.edu
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this software and associated documentation files (the "Software"), to deal
@@ -27,43 +26,39 @@
 #include "hw/riscv/cpudevs.h"
 #include "cpu.h"
 
-// TODO: move constants to cpu.h
-
-/* irq request function, called in hw/irq.h by qemu_irq_raise (level = 1), 
- * qemu_irq_lower (level = 0), qemu_irq_pulse (level = 1, then 0) 
+/* irq request function, called in hw/irq.h by qemu_irq_raise (level = 1),
+ * qemu_irq_lower (level = 0), qemu_irq_pulse (level = 1, then 0)
  *
- * The device will call this once to raise the interrupt line and once to 
+ * The device will call this once to raise the interrupt line and once to
  * lower the interrupt line for level-trigerring
  *
  */
 static void cpu_riscv_irq_request(void *opaque, int irq, int level)
 {
+    // This "irq" number is not a real irq number, just some set of numbers
+    // we choose. These are not the same irq numbers visible to the processor.
+
     RISCVCPU *cpu = opaque;
     CPURISCVState *env = &cpu->env;
     CPUState *cs = CPU(cpu);
 
-    if (unlikely(irq < 0 || irq > 7)) {
-        return;
+    // current irqs:
+    // 7: Machine Timer. MIP_MTIP should have already been set
+    // 4: Host Interrupt. mfromhost should have a nonzero value
+    // 3, 2, 1: Interrupts triggered by the CPU. At least one of
+    //    MIP_STIP, MIP_SSIP, MIP_MSIP should already be set
+    if (unlikely(irq != 7 && !(irq < 5 && irq > 0))) {
+        fprintf(stderr, "Unused IRQ was raised.\n");
+        exit(1);
     }
 
     if (level) {
-        // level high, set the interrupt in CSR_STATUS
-        env->helper_csr[CSR_STATUS] |= (1 << (irq + 24));
-    } else {
-        // level low, turn off the interrupt in CSR_STATUS
-        env->helper_csr[CSR_STATUS] &= ~(1 << (irq + 24));
-    }
-
-    if (env->helper_csr[CSR_STATUS] & (0xFF << (24))) {
-        // call cpu_interrupt from include/qom/cpu.h
-        // this will call cpu_interrupt_handler aka
-        // tcg_handle_interrupt from translate-all.c
         cpu_interrupt(cs, CPU_INTERRUPT_HARD);
     } else {
-        // call cpu_reset_interrupt from qom/cpu.c
-        // this just turns off the relevant bits
-        // in cpu->interrupt_request
-        cpu_reset_interrupt(cs, CPU_INTERRUPT_HARD);
+        if (!env->csr[NEW_CSR_MIP] && !env->csr[NEW_CSR_MFROMHOST]) {
+            // no interrupts pending, no host interrupt for HTIF, reset
+            cpu_reset_interrupt(cs, CPU_INTERRUPT_HARD);
+        }
     }
 }
 
@@ -80,6 +75,8 @@ void cpu_riscv_irq_init_cpu(CPURISCVState *env)
 
 void cpu_riscv_soft_irq(CPURISCVState *env, int irq, int level)
 {
+    printf("NOT USED for RISC-V\n");
+    exit(1);
     if (irq != 0) {
         return;
     }

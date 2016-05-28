@@ -30,8 +30,9 @@
 typedef struct HTIFState HTIFState;
 
 struct HTIFState {
-    uint64_t tohost; // mapped to address base passed into htif_mm_init
-    uint64_t fromhost; // mapped to address base + 0x8 passed into htif_mm_init
+    int allow_tohost;
+    int fromhost_inprogress;
+
     hwaddr tohost_addr;
     hwaddr fromhost_addr;
     qemu_irq irq; // host interrupt line
@@ -40,12 +41,17 @@ struct HTIFState {
     MemoryRegion* main_mem;
     void* main_mem_ram_ptr;
 
+    CPURISCVState *env;
+    CharDriverState *chr;
+    uint64_t pending_read;
+
+
     int block_dev_present;
     // TODO: eventually move the following to a separate HTIF block device driver
     const char *block_fname;
     int block_fd;
     char *real_name;
-
+    char *kernel_cmdline; // for sys_getmainvars
 };
 
 typedef struct request_t request_t;
@@ -63,6 +69,8 @@ extern const MemoryRegionOps htif_io_ops;
 
 /* legacy pre qom */
 HTIFState *htif_mm_init(MemoryRegion *address_space, hwaddr base, 
-                    qemu_irq irq, MemoryRegion *main_mem, char *htifbd_fname);
+                    qemu_irq irq, MemoryRegion *main_mem, const char *htifbd_fname,
+                    const char *kernel_cmdline, CPURISCVState *env,
+                    CharDriverState *chr);
 
 #endif

@@ -18,25 +18,14 @@
  * License along with this library; if not, see <http://www.gnu.org/licenses/>.
  */
 
-#include <assert.h>
 #include "cpu.h"
-#include "helper.h"
+#include "exec/helper-proto.h"
 #include "qemu/host-utils.h"
+#include "exec/cpu_ldst.h"
 
 #define D(x)
 
 #if !defined(CONFIG_USER_ONLY)
-#include "exec/softmmu_exec.h"
-
-#define MMUSUFFIX _mmu
-#define SHIFT 0
-#include "exec/softmmu_template.h"
-#define SHIFT 1
-#include "exec/softmmu_template.h"
-#define SHIFT 2
-#include "exec/softmmu_template.h"
-#define SHIFT 3
-#include "exec/softmmu_template.h"
 
 /* Try to fill the TLB and return an exception if error. If retaddr is
  * NULL, it means that the function was called in C code (i.e. not
@@ -161,9 +150,7 @@ uint32_t helper_clz(uint32_t t0)
 
 uint32_t helper_carry(uint32_t a, uint32_t b, uint32_t cf)
 {
-    uint32_t ncf;
-    ncf = compute_carry(a, b, cf);
-    return ncf;
+    return compute_carry(a, b, cf);
 }
 
 static inline int div_prepare(CPUMBState *env, uint32_t a, uint32_t b)
@@ -478,11 +465,11 @@ void helper_memalign(CPUMBState *env, uint32_t addr, uint32_t dr, uint32_t wr,
 void helper_stackprot(CPUMBState *env, uint32_t addr)
 {
     if (addr < env->slr || addr > env->shr) {
-            qemu_log("Stack protector violation at %x %x %x\n",
-                     addr, env->slr, env->shr);
-            env->sregs[SR_EAR] = addr;
-            env->sregs[SR_ESR] = ESR_EC_STACKPROT;
-            helper_raise_exception(env, EXCP_HW_EXCP);
+        qemu_log("Stack protector violation at %x %x %x\n",
+                 addr, env->slr, env->shr);
+        env->sregs[SR_EAR] = addr;
+        env->sregs[SR_ESR] = ESR_EC_STACKPROT;
+        helper_raise_exception(env, EXCP_HW_EXCP);
     }
 }
 

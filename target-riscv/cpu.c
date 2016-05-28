@@ -1,8 +1,7 @@
 /*
- *  QEMU RISC-V CPU
+ * QEMU RISC-V CPU
  *
- *  Author: Sagar Karandikar, skarandikar@berkeley.edu
- *  Based on the MIPS target
+ * Author: Sagar Karandikar, sagark@eecs.berkeley.edu
  *
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public
@@ -42,12 +41,11 @@ static bool riscv_cpu_has_work(CPUState *cs)
     CPURISCVState *env = &cpu->env;
     bool has_work = false;
 
-    /* It is implementation dependent if non-enabled interrupts
-       wake-up the CPU, however most of the implementations only
-       check for interrupts that can be taken. */
-    if ((cs->interrupt_request & CPU_INTERRUPT_HARD) &&
-        cpu_riscv_hw_interrupts_pending(env)) {
-        has_work = true;
+    if (cs->interrupt_request & CPU_INTERRUPT_HARD) {
+        int interruptno = cpu_riscv_hw_interrupts_pending(env);
+        if (interruptno + 1) {
+            has_work = true;
+        }
     }
 
     return has_work;
@@ -62,6 +60,10 @@ static void riscv_cpu_reset(CPUState *s)
     mcc->parent_reset(s);
     tlb_flush(s, 1);
     cpu_state_reset(env);
+}
+
+static void riscv_cpu_disas_set_info(CPUState *s, disassemble_info *info) {
+    info->print_insn = print_insn_riscv;
 }
 
 static void riscv_cpu_realizefn(DeviceState *dev, Error **errp)
@@ -82,7 +84,7 @@ static void riscv_cpu_initfn(Object *obj)
     CPURISCVState *env = &cpu->env;
 
     cs->env_ptr = env;
-    cpu_exec_init(env);
+    cpu_exec_init(cs, &error_abort);
 
     if (tcg_enabled()) {
         riscv_tcg_init();
@@ -103,6 +105,7 @@ static void riscv_cpu_class_init(ObjectClass *c, void *data)
 
     cc->has_work = riscv_cpu_has_work;
     cc->do_interrupt = riscv_cpu_do_interrupt;
+    cc->cpu_exec_interrupt = riscv_cpu_exec_interrupt;
     cc->dump_state = riscv_cpu_dump_state;
     cc->set_pc = riscv_cpu_set_pc;
     cc->synchronize_from_tb = riscv_cpu_synchronize_from_tb;
@@ -112,10 +115,15 @@ static void riscv_cpu_class_init(ObjectClass *c, void *data)
     cc->handle_mmu_fault = riscv_cpu_handle_mmu_fault;
 #else
     cc->do_unassigned_access = riscv_cpu_unassigned_access;
+    cc->do_unaligned_access = riscv_cpu_do_unaligned_access;
     cc->get_phys_page_debug = riscv_cpu_get_phys_page_debug;
+    // TODO to support migration:
+    // cc->vmsd = &vmstate_riscv_cpu;
 #endif
 
-    cc->gdb_num_core_regs = 73;
+    cc->disas_set_info = riscv_cpu_disas_set_info;
+    cc->gdb_num_core_regs = 132;
+    cc->gdb_stop_before_watchpoint = true;
 }
 
 static const TypeInfo riscv_cpu_type_info = {

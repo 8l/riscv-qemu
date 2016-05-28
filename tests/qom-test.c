@@ -44,38 +44,48 @@ static bool is_blacklisted(const char *arch, const char *mach)
     return false;
 }
 
-static void test_properties(const char *path)
+static void test_properties(const char *path, bool recurse)
 {
     char *child_path;
-    QDict *response, *tuple;
+    QDict *response, *tuple, *tmp;
     QList *list;
     QListEntry *entry;
 
     g_test_message("Obtaining properties of %s", path);
     response = qmp("{ 'execute': 'qom-list',"
-                   "  'arguments': { 'path': '%s' } }", path);
+                   "  'arguments': { 'path': %s } }", path);
     g_assert(response);
+
+    if (!recurse) {
+        QDECREF(response);
+        return;
+    }
 
     g_assert(qdict_haskey(response, "return"));
     list = qobject_to_qlist(qdict_get(response, "return"));
     QLIST_FOREACH_ENTRY(list, entry) {
         tuple = qobject_to_qdict(qlist_entry_obj(entry));
-        if (strstart(qdict_get_str(tuple, "type"), "child<", NULL)) {
+        bool is_child = strstart(qdict_get_str(tuple, "type"), "child<", NULL);
+        bool is_link = strstart(qdict_get_str(tuple, "type"), "link<", NULL);
+
+        if (is_child || is_link) {
             child_path = g_strdup_printf("%s/%s",
                                          path, qdict_get_str(tuple, "name"));
-            test_properties(child_path);
+            test_properties(child_path, is_child);
             g_free(child_path);
         } else {
             const char *prop = qdict_get_str(tuple, "name");
             g_test_message("Testing property %s.%s", path, prop);
-            response = qmp("{ 'execute': 'qom-get',"
-                           "  'arguments': { 'path': '%s',"
-                           "                 'property': '%s' } }",
-                           path, prop);
+            tmp = qmp("{ 'execute': 'qom-get',"
+                      "  'arguments': { 'path': %s,"
+                      "                 'property': %s } }",
+                      path, prop);
             /* qom-get may fail but should not, e.g., segfault. */
-            g_assert(response);
+            g_assert(tmp);
+            QDECREF(tmp);
         }
     }
+    QDECREF(response);
 }
 
 static void test_machine(gconstpointer data)
@@ -87,13 +97,15 @@ static void test_machine(gconstpointer data)
     args = g_strdup_printf("-machine %s", machine);
     qtest_start(args);
 
-    test_properties("/machine");
+    test_properties("/machine", true);
 
     response = qmp("{ 'execute': 'quit' }");
     g_assert(qdict_haskey(response, "return"));
+    QDECREF(response);
 
     qtest_end();
     g_free(args);
+    g_free((void *)machine);
 }
 
 static void add_machine_test_cases(void)
@@ -121,11 +133,13 @@ static void add_machine_test_cases(void)
         g_assert(qstr);
         mname = qstring_get_str(qstr);
         if (!is_blacklisted(arch, mname)) {
-            path = g_strdup_printf("/%s/qom/%s", arch, mname);
-            g_test_add_data_func(path, mname, test_machine);
+            path = g_strdup_printf("qom/%s", mname);
+            qtest_add_data_func(path, g_strdup(mname), test_machine);
         }
     }
+
     qtest_end();
+    QDECREF(response);
 }
 
 int main(int argc, char **argv)

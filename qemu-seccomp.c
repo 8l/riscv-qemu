@@ -16,6 +16,14 @@
 #include <seccomp.h>
 #include "sysemu/seccomp.h"
 
+#if SCMP_VER_MAJOR >= 3
+  #define HAVE_CACHEFLUSH
+#elif SCMP_VER_MAJOR == 2 && SCMP_VER_MINOR >= 3
+  #define HAVE_CACHEFLUSH
+#elif SCMP_VER_MAJOR == 2 && SCMP_VER_MINOR == 2 && SCMP_VER_MICRO >= 3
+  #define HAVE_CACHEFLUSH
+#endif
+
 struct QemuSeccompSyscall {
     int32_t num;
     uint8_t priority;
@@ -143,6 +151,7 @@ static const struct QemuSeccompSyscall seccomp_whitelist[] = {
     { SCMP_SYS(getsockname), 242 },
     { SCMP_SYS(getpeername), 242 },
     { SCMP_SYS(accept4), 242 },
+    { SCMP_SYS(timerfd_settime), 242 },
     { SCMP_SYS(newfstatat), 241 },
     { SCMP_SYS(shutdown), 241 },
     { SCMP_SYS(getsockopt), 241 },
@@ -225,7 +234,22 @@ static const struct QemuSeccompSyscall seccomp_whitelist[] = {
     { SCMP_SYS(fchmod), 240 },
     { SCMP_SYS(shmget), 240 },
     { SCMP_SYS(shmat), 240 },
-    { SCMP_SYS(shmdt), 240 }
+    { SCMP_SYS(shmdt), 240 },
+    { SCMP_SYS(timerfd_create), 240 },
+    { SCMP_SYS(shmctl), 240 },
+    { SCMP_SYS(mlockall), 240 },
+    { SCMP_SYS(mlock), 240 },
+    { SCMP_SYS(munlock), 240 },
+    { SCMP_SYS(semctl), 240 },
+    { SCMP_SYS(fallocate), 240 },
+    { SCMP_SYS(fadvise64), 240 },
+    { SCMP_SYS(inotify_init1), 240 },
+    { SCMP_SYS(inotify_add_watch), 240 },
+    { SCMP_SYS(mbind), 240 },
+    { SCMP_SYS(memfd_create), 240 },
+#ifdef HAVE_CACHEFLUSH
+    { SCMP_SYS(cacheflush), 240 },
+#endif
 };
 
 int seccomp_start(void)

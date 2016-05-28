@@ -11,18 +11,21 @@
 
 #define TYPE_HOST_POWERPC_CPU "host-" TYPE_POWERPC_CPU
 
-void kvmppc_init(void);
-
 #ifdef CONFIG_KVM
 
 uint32_t kvmppc_get_tbfreq(void);
 uint64_t kvmppc_get_clockfreq(void);
 uint32_t kvmppc_get_vmx(void);
 uint32_t kvmppc_get_dfp(void);
+bool kvmppc_get_host_model(char **buf);
+bool kvmppc_get_host_serial(char **buf);
 int kvmppc_get_hasidle(CPUPPCState *env);
 int kvmppc_get_hypercall(CPUPPCState *env, uint8_t *buf, int buf_len);
 int kvmppc_set_interrupt(PowerPCCPU *cpu, int irq, int level);
+void kvmppc_enable_logical_ci_hcalls(void);
+void kvmppc_enable_set_mode_hcall(void);
 void kvmppc_set_papr(PowerPCCPU *cpu);
+int kvmppc_set_compat(PowerPCCPU *cpu, uint32_t cpu_version);
 void kvmppc_set_mpic_proxy(PowerPCCPU *cpu, int mpic_proxy);
 int kvmppc_smt_threads(void);
 int kvmppc_clear_tsr_bits(PowerPCCPU *cpu, uint32_t tsr_bits);
@@ -30,8 +33,10 @@ int kvmppc_or_tsr_bits(PowerPCCPU *cpu, uint32_t tsr_bits);
 int kvmppc_set_tcr(PowerPCCPU *cpu);
 int kvmppc_booke_watchdog_enable(PowerPCCPU *cpu);
 #ifndef CONFIG_USER_ONLY
-off_t kvmppc_alloc_rma(const char *name, MemoryRegion *sysmem);
-void *kvmppc_create_spapr_tce(uint32_t liobn, uint32_t window_size, int *pfd);
+off_t kvmppc_alloc_rma(void **rma);
+bool kvmppc_spapr_use_multitce(void);
+void *kvmppc_create_spapr_tce(uint32_t liobn, uint32_t window_size, int *pfd,
+                              bool need_vfio);
 int kvmppc_remove_spapr_tce(void *table, int pfd, uint32_t window_size);
 int kvmppc_reset_htab(int shift_hint);
 uint64_t kvmppc_rma_size(uint64_t current_size, unsigned int hash_shift);
@@ -48,12 +53,24 @@ void kvmppc_hash64_free_pteg(uint64_t token);
 
 void kvmppc_hash64_write_pte(CPUPPCState *env, target_ulong pte_index,
                              target_ulong pte0, target_ulong pte1);
+bool kvmppc_has_cap_fixup_hcalls(void);
+int kvmppc_enable_hwrng(void);
 
 #else
 
 static inline uint32_t kvmppc_get_tbfreq(void)
 {
     return 0;
+}
+
+static inline bool kvmppc_get_host_model(char **buf)
+{
+    return false;
+}
+
+static inline bool kvmppc_get_host_serial(char **buf)
+{
+    return false;
 }
 
 static inline uint64_t kvmppc_get_clockfreq(void)
@@ -91,8 +108,21 @@ static inline int kvmppc_set_interrupt(PowerPCCPU *cpu, int irq, int level)
     return -1;
 }
 
+static inline void kvmppc_enable_logical_ci_hcalls(void)
+{
+}
+
+static inline void kvmppc_enable_set_mode_hcall(void)
+{
+}
+
 static inline void kvmppc_set_papr(PowerPCCPU *cpu)
 {
+}
+
+static inline int kvmppc_set_compat(PowerPCCPU *cpu, uint32_t cpu_version)
+{
+    return 0;
 }
 
 static inline void kvmppc_set_mpic_proxy(PowerPCCPU *cpu, int mpic_proxy)
@@ -125,26 +155,32 @@ static inline int kvmppc_booke_watchdog_enable(PowerPCCPU *cpu)
 }
 
 #ifndef CONFIG_USER_ONLY
-static inline off_t kvmppc_alloc_rma(const char *name, MemoryRegion *sysmem)
+static inline off_t kvmppc_alloc_rma(void **rma)
 {
     return 0;
 }
 
+static inline bool kvmppc_spapr_use_multitce(void)
+{
+    return false;
+}
+
 static inline void *kvmppc_create_spapr_tce(uint32_t liobn,
-                                            uint32_t window_size, int *fd)
+                                            uint32_t window_size, int *fd,
+                                            bool vfio_accel)
 {
     return NULL;
 }
 
 static inline int kvmppc_remove_spapr_tce(void *table, int pfd,
-                                          uint32_t window_size)
+                                          uint32_t nb_table)
 {
     return -1;
 }
 
 static inline int kvmppc_reset_htab(int shift_hint)
 {
-    return -1;
+    return 0;
 }
 
 static inline uint64_t kvmppc_rma_size(uint64_t current_size,
@@ -211,6 +247,15 @@ static inline void kvmppc_hash64_write_pte(CPUPPCState *env,
     abort();
 }
 
+static inline bool kvmppc_has_cap_fixup_hcalls(void)
+{
+    abort();
+}
+
+static inline int kvmppc_enable_hwrng(void)
+{
+    return -1;
+}
 #endif
 
 #ifndef CONFIG_KVM

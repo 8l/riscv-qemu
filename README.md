@@ -1,19 +1,35 @@
 riscv-qemu [![Build Status](https://travis-ci.org/riscv/riscv-qemu.svg?branch=master)](https://travis-ci.org/riscv/riscv-qemu)
 =========
 
-The riscv-softmmu target for full system emulation is currently supported. 
-It supports booting [riscv-linux] \(currently requires building from the 
-[qemu branch]\). A precompiled copy of the kernel is included in the 
-"hacking_files" directory for convenience (see Method 1 under installation).
+**About:**
 
-Prereqs:
+The `riscv-softmmu` target for full system RV64G emulation is currently supported.
+It supports booting [riscv-linux]. Remote GDB debugging is also supported (see the 
+section below).
+
+**RISC-V Port Authors:**
+
+* Sagar Karandikar (sagark@eecs.berkeley.edu)
+
+**Upstream QEMU Version:**
+
+* v2.5.0
+
+**Notes:**
+
+* The pre-rebase version of QEMU has been moved to a different repo. Going
+forward, only this repo will be updated and the old version will be removed.
+You can temporarily find the old version
+[here](https://github.com/ucb-bar/riscv-qemu-deprecated).
+
+Installation
+--------------
+
+Prerequisites:
 
     $ sudo apt-get install gcc libc6-dev pkg-config bridge-utils uml-utilities zlib1g-dev libglib2.0-dev autoconf automake libtool libsdl1.2-dev
 
-Installation 
---------------
-
-### Method 1 \(Devices: 8250 UART + HTIF Disk\): 
+### Method 1 \(HTIF Devices\):
 
 ####Step 1: Build QEMU
 
@@ -23,35 +39,94 @@ Installation
     $ ./configure --target-list=riscv-softmmu [--prefix=INSTALL_LOCATION]
     $ make
     $ [make install] # if you supplied prefix above
-    $ cd riscv-softmmu
 
 ####Step 2: Obtain Images
 
-To get started, you may download the following kernel image and disk images from
-the [RISC-V Getting Started Guide](http://riscv.org/getting-started.html).
+You can build vmlinux from the [riscv-linux] repo and a root filesystem using [Buildroot] or download the prebuilt copies below. You'll also need a copy of `bbl`.
 
-**a)** [vmlinux](http://riscv.org/qemu/vmlinux)
+**a)** [vmlinux](https://www.eecs.berkeley.edu/~skarandikar/host/qemu/vmlinux)
 
-**b)** [root.bin](http://riscv.org/qemu/root.bin)
+**b)** [rootfs.ext2](https://www.eecs.berkeley.edu/~skarandikar/host/qemu/rootfs.ext2)
 
+**c)** [bbl](https://www.eecs.berkeley.edu/~skarandikar/host/qemu/bbl)
 
 ####Step 3: Run QEMU
 
-Now from the `riscv-softmmu/` directory, start `qemu-system-riscv`:
+To boot Linux (assuming you are in the `riscv-qemu` directory):
 
-    $ ./qemu-system-riscv -hda [your root.bin location] -kernel [your vmlinux location] -nographic
+    $ ./riscv-softmmu/qemu-system-riscv -kernel bbl -append vmlinux -drive file=rootfs.ext2,format=raw -nographic
 
-**IMPORTANT**: To cleanly exit this system, you must enter `halt -f` at the prompt
+Notes about arguments:
+* `-kernel bbl`: This is the path to the bbl bootloader, included when riscv-tools is built.
+* `-append vmlinux`: The path to the linux kernel image.
+* `-drive file=rootfs.ext2,format=raw`: Your root filesystem. You can build one using [Buildroot] or download one above.
+
+Useful optional arguments:
+* `-m 128M`: Set size of memory, in this example, 128 MB
+
+**IMPORTANT**: To cleanly exit this system, you must enter `halt` at the prompt
 and then hit `ctrl-a x`. Otherwise, the root filesystem will likely be corrupted.
+
+####Current limitations:
+
+* The current RISC-V board definition provides only HTIF devices (syscall
+proxy for `bbl`, console, block device). These devices are experimental and will
+be replaced with standard devices. The console especially can fall behind under
+heavy use.
+
+### Method 2 \(Standard Devices\):
+
+Coming soon!
+
+
+Running RISC-V Tests:
+---------------------
+
+A script (`run-rv-tests.py`) for running the RV64 tests from [riscv-tests] is
+included in the `hacking_files` directory. All RV64 tests are expected to pass,
+however you will likely need to increase  `TIMER_INTERVAL` in
+`riscv-tests/env/pt/riscv_test.h`.
+
+Using QEMU to Debug RISC-V Code:
+--------------------------------
+
+QEMU works with riscv-gdb to enable remote debugging. This currently requires
+building `gdb` from a special version of `riscv-gnu-toolchain`, available 
+[here](https://github.com/riscv/riscv-gnu-toolchain/tree/binutils-submodule).
+
+To use this, start QEMU with the additional flags `-S -s`:
+
+    $ ./riscv-softmmu/qemu-system-riscv -S -s -kernel bbl -append vmlinux -drive file=rootfs.ext2,format=raw -nographic
+
+This will start QEMU, but immediately pause and wait for a gdb connection.
+
+Separately, start `riscv64-unknown-elf-gdb`:
+
+    $ riscv64-unknown-elf-gdb [optional binary, e.g. vmlinux]
+
+At the prompt, connect to QEMU:
+
+    (gdb) target remote localhost:1234
+
+At this point, you can use regular gdb commands to singlestep, set breakpoints, 
+read/write registers, etc. If you type `continue` in gdb, you can return to QEMU 
+and interact with the machine as if you were using it without GDB attached.
+
+TODOs:
+------
+
+* Additional device support
 
 Notes
 -----
 
-- Qemu also supports a "linux-user" mode, however this is currently not implemented for RISC-V.
-- Once in a while, you may see a message from qemu of the form `main-loop: WARNING: I/O thread spun for N iterations`. You may safely ignore this message without consequence.
+- QEMU also supports a "linux-user" mode, however this is currently not implemented for RISC-V. For RISC-V, similar functionality can be obtained by using the [proxy kernel] instead of Linux.
 - Files/directories of interest:
   - target-riscv/
   - hw/riscv/
 
 [riscv-linux]:https://github.com/riscv/riscv-linux
-[qemu branch]:https://github.com/riscv/riscv-linux/tree/qemu
+[Buildroot]:https://github.com/a0u/buildroot
+[riscv-tests]:https://github.com/riscv/riscv-tests
+[proxy kernel]:https://github.com/riscv/riscv-pk
+

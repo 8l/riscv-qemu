@@ -1,6 +1,9 @@
 /*
  * QEMU RISC-V CPU
  *
+ * Author: Sagar Karandikar, sagark@eecs.berkeley.edu
+ *
+ *
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public
  * License as published by the Free Software Foundation; either
@@ -74,5 +77,10 @@ void riscv_cpu_dump_state(CPUState *cpu, FILE *f, fprintf_function cpu_fprintf,
 hwaddr riscv_cpu_get_phys_page_debug(CPUState *cpu, vaddr addr);
 int riscv_cpu_gdb_read_register(CPUState *cpu, uint8_t *buf, int reg);
 int riscv_cpu_gdb_write_register(CPUState *cpu, uint8_t *buf, int reg);
+bool riscv_cpu_exec_interrupt(CPUState *cs, int interrupt_request);
+void  riscv_cpu_do_unaligned_access(CPUState *cs,
+                                              target_ulong addr, int rw,
+                                              int is_user, uintptr_t retaddr);
+
 
 #endif
